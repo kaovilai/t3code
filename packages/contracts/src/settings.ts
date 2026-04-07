@@ -68,6 +68,8 @@ export const ClaudeSettings = Schema.Struct({
   enabled: Schema.Boolean.pipe(Schema.withDecodingDefault(() => true)),
   binaryPath: makeBinaryPathSetting("claude"),
   customModels: Schema.Array(Schema.String).pipe(Schema.withDecodingDefault(() => [])),
+  vertexProjectId: TrimmedString.pipe(Schema.withDecodingDefault(() => "")),
+  vertexRegion: TrimmedString.pipe(Schema.withDecodingDefault(() => "")),
 });
 export type ClaudeSettings = typeof ClaudeSettings.Type;
 
@@ -159,6 +161,8 @@ const ClaudeSettingsPatch = Schema.Struct({
   enabled: Schema.optionalKey(Schema.Boolean),
   binaryPath: Schema.optionalKey(Schema.String),
   customModels: Schema.optionalKey(Schema.Array(Schema.String)),
+  vertexProjectId: Schema.optionalKey(Schema.String),
+  vertexRegion: Schema.optionalKey(Schema.String),
 });
 
 export const ServerSettingsPatch = Schema.Struct({

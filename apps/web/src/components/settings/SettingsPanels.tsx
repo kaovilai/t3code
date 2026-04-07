@@ -535,7 +535,11 @@ export function GeneralSettingsPanel() {
     claudeAgent: Boolean(
       settings.providers.claudeAgent.binaryPath !==
         DEFAULT_UNIFIED_SETTINGS.providers.claudeAgent.binaryPath ||
-      settings.providers.claudeAgent.customModels.length > 0,
+      settings.providers.claudeAgent.customModels.length > 0 ||
+      settings.providers.claudeAgent.vertexProjectId !==
+        DEFAULT_UNIFIED_SETTINGS.providers.claudeAgent.vertexProjectId ||
+      settings.providers.claudeAgent.vertexRegion !==
+        DEFAULT_UNIFIED_SETTINGS.providers.claudeAgent.vertexRegion,
     ),
   });
   const [customModelInputByProvider, setCustomModelInputByProvider] = useState<
@@ -1270,6 +1274,76 @@ export function GeneralSettingsPanel() {
                             </span>
                           ) : null}
                         </label>
+                      </div>
+                    ) : null}
+
+                    {providerCard.provider === "claudeAgent" ? (
+                      <div className="border-t border-border/60 px-4 py-3 sm:px-5">
+                        <div className="text-xs font-medium text-foreground">
+                          Google Vertex AI (optional)
+                        </div>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          Use Claude via Google Cloud Vertex AI with Application Default
+                          Credentials. Leave blank to use the direct Anthropic API.
+                        </p>
+                        <div className="mt-2 space-y-2">
+                          <label
+                            htmlFor="provider-claudeAgent-vertex-project-id"
+                            className="block"
+                          >
+                            <span className="text-xs font-medium text-foreground">
+                              GCP Project ID
+                            </span>
+                            <Input
+                              id="provider-claudeAgent-vertex-project-id"
+                              className="mt-1.5"
+                              value={settings.providers.claudeAgent.vertexProjectId}
+                              onChange={(event) =>
+                                updateSettings({
+                                  providers: {
+                                    ...settings.providers,
+                                    claudeAgent: {
+                                      ...settings.providers.claudeAgent,
+                                      vertexProjectId: event.target.value,
+                                    },
+                                  },
+                                })
+                              }
+                              placeholder="my-gcp-project-id"
+                              spellCheck={false}
+                            />
+                            <span className="mt-1 block text-xs text-muted-foreground">
+                              Sets{" "}
+                              <code className="font-mono">ANTHROPIC_VERTEX_PROJECT_ID</code>.
+                            </span>
+                          </label>
+                          <label htmlFor="provider-claudeAgent-vertex-region" className="block">
+                            <span className="text-xs font-medium text-foreground">
+                              Vertex AI Region
+                            </span>
+                            <Input
+                              id="provider-claudeAgent-vertex-region"
+                              className="mt-1.5"
+                              value={settings.providers.claudeAgent.vertexRegion}
+                              onChange={(event) =>
+                                updateSettings({
+                                  providers: {
+                                    ...settings.providers,
+                                    claudeAgent: {
+                                      ...settings.providers.claudeAgent,
+                                      vertexRegion: event.target.value,
+                                    },
+                                  },
+                                })
+                              }
+                              placeholder="us-east5"
+                              spellCheck={false}
+                            />
+                            <span className="mt-1 block text-xs text-muted-foreground">
+                              Sets <code className="font-mono">CLOUD_ML_REGION</code>.
+                            </span>
+                          </label>
+                        </div>
                       </div>
                     ) : null}
 

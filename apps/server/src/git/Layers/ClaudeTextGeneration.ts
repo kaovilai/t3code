@@ -32,6 +32,7 @@ import {
 import { normalizeClaudeModelOptionsWithCapabilities } from "@t3tools/shared/model";
 import { ServerSettingsService } from "../../serverSettings.ts";
 import { getClaudeModelCapabilities } from "../../provider/Layers/ClaudeProvider.ts";
+import { buildVertexEnv } from "@t3tools/shared/vertexEnv";
 
 const CLAUDE_TIMEOUT_MS = 180_000;
 
@@ -118,6 +119,7 @@ const makeClaudeTextGeneration = Effect.gen(function* () {
         {
           cwd,
           shell: process.platform === "win32",
+          env: buildVertexEnv(claudeSettings),
           stdin: {
             stream: Stream.encodeText(Stream.make(prompt)),
           },

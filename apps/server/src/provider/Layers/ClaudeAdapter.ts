@@ -46,6 +46,7 @@ import {
   resolveEffort,
   trimOrNull,
 } from "@t3tools/shared/model";
+import { buildVertexEnv } from "@t3tools/shared/vertexEnv";
 import {
   Cause,
   DateTime,
@@ -2714,7 +2715,7 @@ const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
         ...(newSessionId ? { sessionId: newSessionId } : {}),
         includePartialMessages: true,
         canUseTool,
-        env: process.env,
+        env: buildVertexEnv(claudeSettings),
         ...(input.cwd ? { additionalDirectories: [input.cwd] } : {}),
       };
 

@@ -66,3 +66,49 @@ Open from any device in your tailnet:
 `http://<tailnet-ip>:3773`
 
 You can also bind `--host 0.0.0.0` and connect through the Tailnet IP, but binding directly to the Tailnet IP limits exposure.
+
+## 3) Google Vertex AI / Application Default Credentials (ADC)
+
+T3 Code supports Claude via [Google Cloud Vertex AI](https://cloud.google.com/vertex-ai) using [Application Default Credentials (ADC)](https://cloud.google.com/docs/authentication/application-default-credentials). This is opt-in and additive — the direct Anthropic API path is unchanged.
+
+### Prerequisites
+
+1. Install the [Google Cloud CLI](https://cloud.google.com/sdk/docs/install) and authenticate:
+
+   ```bash
+   gcloud auth application-default login
+   ```
+
+   Or set the `GOOGLE_APPLICATION_CREDENTIALS` environment variable to a service account key file path.
+
+2. Enable the Vertex AI API in your GCP project and ensure your account has the `roles/aiplatform.user` IAM role (or equivalent).
+
+3. [Enable Claude models in Vertex AI Model Garden](https://cloud.google.com/vertex-ai/generative-ai/docs/partner-models/use-claude) for your project and region.
+
+### Configuration
+
+Configure Vertex AI in the T3 Code **Settings → Providers → Claude** panel:
+
+| Setting | Description |
+| ------- | ----------- |
+| **GCP Project ID** | Your Google Cloud project ID (e.g. `my-gcp-project`). Sets `ANTHROPIC_VERTEX_PROJECT_ID`. |
+| **Vertex AI Region** | The region where Claude models are deployed (e.g. `us-east5`). Sets `CLOUD_ML_REGION`. |
+
+Both fields can alternatively be set as environment variables when launching T3 Code — the in-app settings take precedence over the ambient environment:
+
+```bash
+export ANTHROPIC_VERTEX_PROJECT_ID="my-gcp-project"
+export CLOUD_ML_REGION="us-east5"
+npx t3
+```
+
+### How it works
+
+- When **GCP Project ID** or **Vertex AI Region** is set, T3 Code injects `ANTHROPIC_VERTEX_PROJECT_ID` and `CLOUD_ML_REGION` into the environment of every Claude CLI subprocess it spawns.
+- The Claude CLI picks up these variables and routes requests through Vertex AI automatically.
+- ADC credentials (`GOOGLE_APPLICATION_CREDENTIALS`, `gcloud auth application-default login`, or workload identity) are transparently forwarded to the subprocess because T3 Code inherits the full server process environment.
+- The `claude auth status` check is skipped in Vertex mode — Anthropic account login is not required.
+
+### Fallback
+
+If neither `vertexProjectId` (settings) nor `ANTHROPIC_VERTEX_PROJECT_ID` (environment) is set, T3 Code uses the direct Anthropic API as usual.
