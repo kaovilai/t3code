@@ -32,27 +32,7 @@ import {
 import { normalizeClaudeModelOptionsWithCapabilities } from "@t3tools/shared/model";
 import { ServerSettingsService } from "../../serverSettings.ts";
 import { getClaudeModelCapabilities } from "../../provider/Layers/ClaudeProvider.ts";
-import type { ClaudeSettings } from "@t3tools/contracts";
-
-/**
- * Build the environment record to pass to the Claude CLI process.
- *
- * When Vertex AI is configured in settings, injects `ANTHROPIC_VERTEX_PROJECT_ID`
- * and `CLOUD_ML_REGION` so the CLI uses Google Cloud Vertex AI with Application
- * Default Credentials instead of the direct Anthropic API.
- */
-function buildVertexEnv(
-  claudeSettings: Pick<ClaudeSettings, "vertexProjectId" | "vertexRegion"> | undefined,
-): NodeJS.ProcessEnv {
-  const extras: Record<string, string> = {};
-  if (claudeSettings?.vertexProjectId) {
-    extras["ANTHROPIC_VERTEX_PROJECT_ID"] = claudeSettings.vertexProjectId;
-  }
-  if (claudeSettings?.vertexRegion) {
-    extras["CLOUD_ML_REGION"] = claudeSettings.vertexRegion;
-  }
-  return Object.keys(extras).length > 0 ? { ...process.env, ...extras } : process.env;
-}
+import { buildVertexEnv } from "@t3tools/shared/vertexEnv";
 
 const CLAUDE_TIMEOUT_MS = 180_000;
 
