@@ -541,7 +541,10 @@ export const checkClaudeProviderStatus = Effect.fn("checkClaudeProviderStatus")(
   // ── Auth check + subscription detection ────────────────────────────
 
   const isVertexMode =
-    Boolean(claudeSettings.vertexProjectId) || Boolean(claudeSettings.vertexRegion);
+    Boolean(claudeSettings.vertexProjectId) ||
+    Boolean(claudeSettings.vertexRegion) ||
+    Boolean(process.env["ANTHROPIC_VERTEX_PROJECT_ID"]) ||
+    Boolean(process.env["CLOUD_ML_REGION"]);
 
   // When Vertex AI is configured, `claude auth status` reflects the Anthropic
   // account login state, which is irrelevant — auth is handled by Google ADC.
@@ -560,7 +563,7 @@ export const checkClaudeProviderStatus = Effect.fn("checkClaudeProviderStatus")(
         auth: {
           status: "authenticated",
           type: "vertexAdc",
-          label: `Google Vertex AI (project: ${claudeSettings.vertexProjectId || "(env)"}, region: ${claudeSettings.vertexRegion || "(env)"})`,
+          label: `Google Vertex AI (project: ${claudeSettings.vertexProjectId || process.env["ANTHROPIC_VERTEX_PROJECT_ID"] || "(from environment)"}, region: ${claudeSettings.vertexRegion || process.env["CLOUD_ML_REGION"] || "(from environment)"})`,
         },
       },
     });

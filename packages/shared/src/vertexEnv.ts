@@ -30,5 +30,5 @@ export function buildVertexEnv(
   if (claudeSettings?.vertexRegion) {
     extras["CLOUD_ML_REGION"] = claudeSettings.vertexRegion;
   }
-  return Object.keys(extras).length > 0 ? { ...process.env, ...extras } : process.env;
+  return { ...process.env, ...extras };
 }
