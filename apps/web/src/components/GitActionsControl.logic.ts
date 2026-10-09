@@ -160,6 +160,14 @@ export function buildGitActionProgressStages(input: {
   return [...branchStages, ...commitStages, pushStage, ...prStages];
 }
 
+/** Falls back to the thread's linked change request when the ref-derived status has none. */
+export function withLinkedPullRequest(
+  gitStatus: VcsStatusResult | null,
+  linkedPr: VcsStatusResult["pr"],
+): VcsStatusResult | null {
+  return gitStatus && !gitStatus.pr && linkedPr ? { ...gitStatus, pr: linkedPr } : gitStatus;
+}
+
 export function buildMenuItems(
   gitStatus: VcsStatusResult | null,
   isBusy: boolean,

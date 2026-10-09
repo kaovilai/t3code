@@ -13,6 +13,7 @@ import {
   resolveQuickAction,
   resolveThreadBranchUpdate,
   resolveThreadBranchMetadataPatch,
+  withLinkedPullRequest,
 } from "./GitActionsControl.logic";
 
 function status(overrides: Partial<VcsStatusResult> = {}): VcsStatusResult {
@@ -1236,5 +1237,38 @@ describe("resolveAutoFeatureBranchName", () => {
   it("falls back to feature/update when no preferred name is provided", () => {
     const ref = resolveAutoFeatureBranchName(["main"]);
     assert.equal(ref, "feature/update");
+  });
+});
+
+describe("withLinkedPullRequest", () => {
+  const linkedPr = {
+    number: 17521,
+    title: "Linked PR",
+    url: "https://example.com/pr/17521",
+    baseRef: "main",
+    headRef: "other/branch",
+    state: "open",
+  } as const;
+
+  it("hides the create-PR entry when the thread links a PR from another ref", () => {
+    const items = buildMenuItems(
+      withLinkedPullRequest(status({ aheadCount: 2, pr: null }), linkedPr),
+      false,
+    );
+    assert.deepEqual(
+      items.map((item) => item.id),
+      ["commit", "push"],
+    );
+  });
+
+  it("keeps the ref-derived PR when present", () => {
+    const own = { ...linkedPr, number: 1 };
+    assert.equal(withLinkedPullRequest(status({ pr: own }), linkedPr)?.pr?.number, 1);
+  });
+
+  it("passes status through without a linked PR or status", () => {
+    const base = status({ pr: null });
+    assert.equal(withLinkedPullRequest(base, null), base);
+    assert.equal(withLinkedPullRequest(null, linkedPr), null);
   });
 });
