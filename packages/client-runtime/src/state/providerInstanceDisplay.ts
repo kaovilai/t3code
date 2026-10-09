@@ -72,13 +72,13 @@ export function normalizeProviderAccentColor(value: string | undefined): string 
 
 /**
  * Palette for auto-assigned accent colors. All readable under the badge's
- * white text.
+ * white text (each at least 4.5:1 contrast).
  */
 const AUTO_ACCENT_PALETTE = [
   "#6e40c9",
   "#1a73e8",
-  "#10a37f",
-  "#d97706",
+  "#0b7a5f",
+  "#b45309",
   "#c2410c",
   "#be185d",
   "#0e7490",
