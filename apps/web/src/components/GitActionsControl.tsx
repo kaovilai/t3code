@@ -56,9 +56,12 @@ import { Spinner } from "~/components/ui/spinner";
 import { Toggle, ToggleGroup } from "~/components/ui/toggle-group";
 import { cn } from "~/lib/utils";
 import { useOpenPrLink } from "~/lib/openPullRequestLink";
+import { resolveThreadCurrentPullRequestLink } from "@t3tools/shared/threadPullRequests";
+import { useSupportsMultiplePullRequests } from "~/hooks/useSupportsMultiplePullRequests";
 import { useLinkedThreadPullRequest } from "./ThreadStatusIndicators";
 import {
   buildMenuItems,
+  resolveLinkedPullRequestForActions,
   withLinkedPullRequest,
   formatGitActionElapsed,
   GIT_ACTION_SUCCESS_VISIBLE_MS,
@@ -1228,10 +1231,23 @@ export default function GitActionsControl({
     activeServerThread?.pullRequests,
     activeServerThread?.branchPullRequest,
   );
-  const gitStatusForActions = useMemo(
-    () => withLinkedPullRequest(gitStatus, linkedPullRequestStatus?.pr ?? null),
-    [gitStatus, linkedPullRequestStatus],
+  const supportsMultiplePullRequests = useSupportsMultiplePullRequests(
+    activeThreadRef?.environmentId ?? null,
   );
+  const gitStatusForActions = useMemo(() => {
+    const currentLink = supportsMultiplePullRequests
+      ? resolveThreadCurrentPullRequestLink(activeServerThread?.pullRequests ?? [])
+      : null;
+    return withLinkedPullRequest(
+      gitStatus,
+      resolveLinkedPullRequestForActions(linkedPullRequestStatus?.pr ?? null, currentLink),
+    );
+  }, [
+    gitStatus,
+    linkedPullRequestStatus,
+    supportsMultiplePullRequests,
+    activeServerThread?.pullRequests,
+  ]);
   // Matches the diff panel's Changes view. Older servers only report uncommitted totals.
   const changesTotals = gitStatusForActions?.branchChanges ?? gitStatusForActions?.workingTree;
 
