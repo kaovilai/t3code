@@ -309,8 +309,14 @@ private final class ComposerTextView: UITextView {
 
     for (index, provider) in providers.enumerated() {
       group.enter()
+      // loadDataRepresentation needs an identifier the provider registered, not
+      // the `public.image` supertype, so ask for its own image subtype.
       let loadFromData = {
-        provider.loadDataRepresentation(forTypeIdentifier: UTType.image.identifier) { data, _ in
+        guard let type = provider.registeredContentTypes.first(where: { $0.conforms(to: .image) }) else {
+          group.leave()
+          return
+        }
+        provider.loadDataRepresentation(forTypeIdentifier: type.identifier) { data, _ in
           defer { group.leave() }
           store(data.flatMap(UIImage.init(data:)), at: index)
         }
