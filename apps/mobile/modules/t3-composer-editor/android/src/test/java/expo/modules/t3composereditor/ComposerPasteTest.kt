@@ -9,6 +9,9 @@ import android.view.KeyEvent
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputContentInfo
 import androidx.core.view.inputmethod.EditorInfoCompat
+import java.io.ByteArrayInputStream
+import java.io.File
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -17,6 +20,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
@@ -24,6 +28,7 @@ import org.robolectric.annotation.Config
 class ComposerPasteTest {
   private val context = RuntimeEnvironment.getApplication()
   private val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+  private val imageBytes = byteArrayOf(1, 2, 3, 4)
   private val editor = SelectionAwareEditText(context).apply {
     textPasteThresholdBytes = 32 * 1024
     maxInputChars = 120_000
@@ -132,10 +137,9 @@ class ComposerPasteTest {
     assertTrue(EditorInfoCompat.getContentMimeTypes(info).contains("image/*"))
     val pasted = mutableListOf<String>()
     editor.pasteImagesListener = { pasted += it }
-    val content = InputContentInfo(
-      Uri.parse("content://com.example/sticker"),
-      ClipDescription("sticker", arrayOf(mimeType))
-    )
+    val uri = Uri.parse("content://com.example/sticker")
+    shadowOf(context.contentResolver).registerInputStream(uri, ByteArrayInputStream(imageBytes))
+    val content = InputContentInfo(uri, ClipDescription("sticker", arrayOf(mimeType)))
     return connection.commitContent(content, 0, null) to pasted
   }
 
@@ -144,7 +148,18 @@ class ComposerPasteTest {
     val (handled, pasted) = commitContent("image/png")
 
     assertTrue(handled)
-    assertEquals(listOf("content://com.example/sticker"), pasted)
+    assertEquals(1, pasted.size)
+    assertTrue(pasted.single().startsWith("file://"))
+    assertTrue(pasted.single().endsWith(".png"))
+    assertArrayEquals(imageBytes, File(Uri.parse(pasted.single()).path!!).readBytes())
+  }
+
+  @Test
+  fun keyboardCommittedImagesKeepTheirMimeTypeExtension() {
+    val (handled, pasted) = commitContent("image/gif")
+
+    assertTrue(handled)
+    assertTrue(pasted.single().endsWith(".gif"))
   }
 
   @Test

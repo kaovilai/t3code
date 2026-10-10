@@ -7,6 +7,7 @@ import android.graphics.Color
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Typeface
+import android.net.Uri
 import android.os.Build
 import android.text.Editable
 import android.text.InputType
@@ -25,6 +26,7 @@ import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
 import android.view.inputmethod.InputConnectionWrapper
 import android.view.inputmethod.InputMethodManager
+import android.webkit.MimeTypeMap
 import android.widget.EditText
 import androidx.core.view.inputmethod.EditorInfoCompat
 import androidx.core.view.inputmethod.InputConnectionCompat
@@ -34,6 +36,8 @@ import expo.modules.kotlin.viewevent.EventDispatcher
 import expo.modules.kotlin.views.ExpoView
 import expo.modules.t3markdowntext.T3ContextChip
 import org.json.JSONObject
+import java.io.File
+import java.util.UUID
 import kotlin.math.max
 
 class T3ComposerEditorView(context: Context, appContext: AppContext) : ExpoView(
@@ -669,7 +673,7 @@ internal class SelectionAwareEditText(context: Context) : EditText(context) {
     // InputConnection.commitContent rather than the paste menu, and only
     // offer them when the field advertises the MIME types it accepts.
     EditorInfoCompat.setContentMimeTypes(outAttrs, arrayOf("image/*"))
-    val contentConnection = InputConnectionCompat.createWrapper(this, connection, outAttrs) { contentInfo, flags, _ ->
+    val contentConnection = InputConnectionCompat.createWrapper(connection, outAttrs) { contentInfo, flags, _ ->
       commitImageContent(contentInfo, flags)
     }
     return object : InputConnectionWrapper(contentConnection, false) {
@@ -686,25 +690,36 @@ internal class SelectionAwareEditText(context: Context) : EditText(context) {
     }
   }
 
+  /**
+   * The keyboard's content URI is only readable under a temporary grant, and the JS paste
+   * handler reads its URI later and infers the image type from the extension. Copy the bytes
+   * into app-owned cache under the committed MIME type's extension while the grant is held.
+   */
   private fun commitImageContent(
     contentInfo: InputContentInfoCompat,
     flags: Int
   ): Boolean {
     val listener = pasteImagesListener
     if (readOnly || listener == null) return false
-    val hasImage = (0 until contentInfo.description.mimeTypeCount).any {
-      contentInfo.description.getMimeType(it).startsWith("image/")
+    val description = contentInfo.description
+    val mimeType = (0 until description.mimeTypeCount)
+      .map(description::getMimeType)
+      .firstOrNull { it.startsWith("image/") } ?: return false
+    val granted = flags and InputConnectionCompat.INPUT_CONTENT_GRANT_READ_URI_PERMISSION != 0
+    return try {
+      if (granted) contentInfo.requestPermission()
+      val extension = MimeTypeMap.getSingleton().getExtensionFromMimeType(mimeType) ?: "png"
+      val dir = File(context.cacheDir, "composer-ime-images").apply { mkdirs() }
+      val file = File(dir, "${UUID.randomUUID()}.$extension")
+      val input = context.contentResolver.openInputStream(contentInfo.contentUri) ?: return false
+      input.use { source -> file.outputStream().use { source.copyTo(it) } }
+      listener(listOf(Uri.fromFile(file).toString()))
+      true
+    } catch (_: Exception) {
+      false
+    } finally {
+      if (granted) contentInfo.releasePermission()
     }
-    if (!hasImage) return false
-    if (flags and InputConnectionCompat.INPUT_CONTENT_GRANT_READ_URI_PERMISSION != 0) {
-      try {
-        contentInfo.requestPermission()
-      } catch (_: Exception) {
-        return false
-      }
-    }
-    listener(listOf(contentInfo.contentUri.toString()))
-    return true
   }
 
   override fun onSelectionChanged(selStart: Int, selEnd: Int) {
