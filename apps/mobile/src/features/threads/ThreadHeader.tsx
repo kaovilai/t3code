@@ -49,6 +49,18 @@ export function ThreadHeader(
         onPress: filesVisible ? toggleAuxiliaryPane : props.onOpenFilesInspector,
       });
     }
+    if (props.hasWorkspaceRoot && props.gitControls.canOpenTerminal) {
+      actions.push({
+        accessibilityLabel: "Open terminal",
+        icon: "terminal",
+        onPress: () => onOpenTerminal(null),
+      });
+    }
+    actions.push({
+      accessibilityLabel: "Open git controls",
+      icon: "point.topleft.down.curvedto.point.bottomright.up",
+      onPress: props.onOpenGitInspector,
+    });
     if (linkedPullRequestAction !== null) {
       actions.push({
         accessibilityLabel: linkedPullRequestAction.label,
@@ -67,18 +79,6 @@ export function ThreadHeader(
             : props.onOpenGitInspector,
       });
     }
-    if (props.hasWorkspaceRoot && props.gitControls.canOpenTerminal) {
-      actions.push({
-        accessibilityLabel: "Open terminal",
-        icon: "terminal",
-        onPress: () => onOpenTerminal(null),
-      });
-    }
-    actions.push({
-      accessibilityLabel: "Open git controls",
-      icon: "point.topleft.down.curvedto.point.bottomright.up",
-      onPress: props.onOpenGitInspector,
-    });
     if (onMergeBack) {
       actions.push({
         accessibilityLabel: "Merge back to source",
