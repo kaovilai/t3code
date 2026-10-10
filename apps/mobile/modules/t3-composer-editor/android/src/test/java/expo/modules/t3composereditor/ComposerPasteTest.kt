@@ -5,12 +5,14 @@ import android.content.ClipDescription
 import android.content.ClipboardManager
 import android.content.Context
 import android.net.Uri
+import android.os.Looper
 import android.view.KeyEvent
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputContentInfo
 import androidx.core.view.inputmethod.EditorInfoCompat
 import java.io.ByteArrayInputStream
 import java.io.File
+import java.util.concurrent.Executor
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -136,11 +138,14 @@ class ComposerPasteTest {
     val connection = editor.onCreateInputConnection(info)!!
     assertTrue(EditorInfoCompat.getContentMimeTypes(info).contains("image/*"))
     val pasted = mutableListOf<String>()
+    editor.copyExecutor = Executor { it.run() }
     editor.pasteImagesListener = { pasted += it }
     val uri = Uri.parse("content://com.example/sticker")
     shadowOf(context.contentResolver).registerInputStream(uri, ByteArrayInputStream(imageBytes))
     val content = InputContentInfo(uri, ClipDescription("sticker", arrayOf(mimeType)))
-    return connection.commitContent(content, 0, null) to pasted
+    val handled = connection.commitContent(content, 0, null)
+    shadowOf(Looper.getMainLooper()).idle()
+    return handled to pasted
   }
 
   @Test

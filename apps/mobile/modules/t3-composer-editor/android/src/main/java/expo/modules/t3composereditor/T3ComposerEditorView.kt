@@ -37,6 +37,10 @@ import expo.modules.kotlin.views.ExpoView
 import expo.modules.t3markdowntext.T3ContextChip
 import org.json.JSONObject
 import java.io.File
+import java.io.InputStream
+import java.io.OutputStream
+import java.util.concurrent.Executor
+import java.util.concurrent.Executors
 import java.util.UUID
 import kotlin.math.max
 
@@ -599,6 +603,7 @@ internal class SelectionAwareEditText(context: Context) : EditText(context) {
   var textPasteThresholdBytes = 0
   var maxInputChars = Int.MAX_VALUE
   var clipboardFragment = ""
+  var copyExecutor: Executor = Executors.newSingleThreadExecutor()
 
   /**
    * Placeholder shown while the draft is empty. An editable TextView never ellipsizes its hint,
@@ -692,8 +697,9 @@ internal class SelectionAwareEditText(context: Context) : EditText(context) {
 
   /**
    * The keyboard's content URI is only readable under a temporary grant, and the JS paste
-   * handler reads its URI later and infers the image type from the extension. Copy the bytes
-   * into app-owned cache under the committed MIME type's extension while the grant is held.
+   * handler reads its URI later and infers the image type from the extension. Accept the
+   * commit right away, then copy a size-capped image into app-owned cache under its MIME
+   * type's extension off the input thread, and release the grant once the copy is done.
    */
   private fun commitImageContent(
     contentInfo: InputContentInfoCompat,
@@ -706,19 +712,39 @@ internal class SelectionAwareEditText(context: Context) : EditText(context) {
       .map(description::getMimeType)
       .firstOrNull { it.startsWith("image/") } ?: return false
     val granted = flags and InputConnectionCompat.INPUT_CONTENT_GRANT_READ_URI_PERMISSION != 0
-    return try {
+    try {
       if (granted) contentInfo.requestPermission()
-      val extension = MimeTypeMap.getSingleton().getExtensionFromMimeType(mimeType) ?: "png"
-      val dir = File(context.cacheDir, "composer-ime-images").apply { mkdirs() }
-      val file = File(dir, "${UUID.randomUUID()}.$extension")
-      val input = context.contentResolver.openInputStream(contentInfo.contentUri) ?: return false
-      input.use { source -> file.outputStream().use { source.copyTo(it) } }
-      listener(listOf(Uri.fromFile(file).toString()))
-      true
     } catch (_: Exception) {
-      false
-    } finally {
+      return false
+    }
+    val extension = MimeTypeMap.getSingleton().getExtensionFromMimeType(mimeType) ?: "png"
+    copyExecutor.execute {
+      val file = copyCommittedImage(contentInfo.contentUri, extension)
       if (granted) contentInfo.releasePermission()
+      if (file != null) post { listener(listOf(Uri.fromFile(file).toString())) }
+    }
+    return true
+  }
+
+  private fun copyCommittedImage(source: Uri, extension: String): File? {
+    val file = File(
+      File(context.cacheDir, "composer-ime-images").apply { mkdirs() },
+      "${UUID.randomUUID()}.$extension"
+    )
+    return try {
+      val input = context.contentResolver.openInputStream(source) ?: return null
+      val copied = input.use { stream ->
+        file.outputStream().use { stream.copyTo(it, MAX_COMMITTED_IMAGE_BYTES + 1) }
+      }
+      if (copied > MAX_COMMITTED_IMAGE_BYTES) {
+        file.delete()
+        null
+      } else {
+        file
+      }
+    } catch (_: Exception) {
+      file.delete()
+      null
     }
   }
 
@@ -819,4 +845,20 @@ internal class SelectionAwareEditText(context: Context) : EditText(context) {
     }
     return super.onKeyShortcut(keyCode, event)
   }
+}
+
+// Matches PROVIDER_SEND_TURN_MAX_IMAGE_BYTES; larger images are rejected downstream anyway.
+private const val MAX_COMMITTED_IMAGE_BYTES = 10L * 1024 * 1024
+
+/** Copies at most [limit] bytes and returns how many were copied. */
+private fun InputStream.copyTo(out: OutputStream, limit: Long): Long {
+  val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+  var total = 0L
+  while (total < limit) {
+    val read = read(buffer, 0, minOf(buffer.size.toLong(), limit - total).toInt())
+    if (read < 0) break
+    out.write(buffer, 0, read)
+    total += read
+  }
+  return total
 }
