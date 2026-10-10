@@ -603,7 +603,7 @@ internal class SelectionAwareEditText(context: Context) : EditText(context) {
   var textPasteThresholdBytes = 0
   var maxInputChars = Int.MAX_VALUE
   var clipboardFragment = ""
-  var copyExecutor: Executor = Executors.newSingleThreadExecutor()
+  var copyExecutor: Executor = committedImageExecutor
 
   /**
    * Placeholder shown while the draft is empty. An editable TextView never ellipsizes its hint,
@@ -846,6 +846,9 @@ internal class SelectionAwareEditText(context: Context) : EditText(context) {
     return super.onKeyShortcut(keyCode, event)
   }
 }
+
+// One worker shared by every editor so views do not each leave a thread behind.
+private val committedImageExecutor: Executor by lazy { Executors.newSingleThreadExecutor() }
 
 // Matches PROVIDER_SEND_TURN_MAX_IMAGE_BYTES; larger images are rejected downstream anyway.
 private const val MAX_COMMITTED_IMAGE_BYTES = 10L * 1024 * 1024
