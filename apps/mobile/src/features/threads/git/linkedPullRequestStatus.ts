@@ -1,5 +1,8 @@
 import type { ThreadPullRequestLink, VcsStatusResult } from "@t3tools/contracts";
-import { resolveThreadCurrentPullRequestLink } from "@t3tools/shared/threadPullRequests";
+import {
+  resolveThreadCurrentPullRequestLink,
+  visibleThreadPullRequests,
+} from "@t3tools/shared/threadPullRequests";
 
 /**
  * A thread's linked pull request can live on a ref other than the checkout (a fork branch, a
@@ -28,4 +31,24 @@ export function withLinkedPullRequest(
       ...(snapshot ? { isDraft: snapshot.isDraft, updatedAt: snapshot.updatedAt } : {}),
     },
   };
+}
+
+export type LinkedPullRequestHeaderAction =
+  | { readonly kind: "open"; readonly label: string; readonly url: string }
+  | { readonly kind: "list"; readonly label: string };
+
+/**
+ * What the thread header offers for the thread's linked pull requests: open the only one
+ * directly, or show the Git sheet's list when there are several. Null when nothing is linked.
+ */
+export function resolveLinkedPullRequestHeaderAction(
+  pullRequests: ReadonlyArray<ThreadPullRequestLink> | undefined,
+): LinkedPullRequestHeaderAction | null {
+  const links = visibleThreadPullRequests(pullRequests ?? []);
+  const [only] = links;
+  if (only === undefined) return null;
+  if (links.length === 1) {
+    return { kind: "open", label: `Open pull request #${only.number}`, url: only.url };
+  }
+  return { kind: "list", label: `Linked pull requests (${links.length})` };
 }

@@ -1,7 +1,10 @@
 import type { ThreadPullRequestLink, VcsStatusResult } from "@t3tools/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
-import { withLinkedPullRequest } from "./linkedPullRequestStatus";
+import {
+  resolveLinkedPullRequestHeaderAction,
+  withLinkedPullRequest,
+} from "./linkedPullRequestStatus";
 
 const status = { isRepo: true, refName: "fork-branch", pr: null } as unknown as VcsStatusResult;
 
@@ -64,5 +67,30 @@ describe("withLinkedPullRequest", () => {
     expect(withLinkedPullRequest(null, [link(7)])).toBeNull();
     expect(withLinkedPullRequest(status, undefined)).toBe(status);
     expect(withLinkedPullRequest(status, [])).toBe(status);
+  });
+});
+
+describe("resolveLinkedPullRequestHeaderAction", () => {
+  it("opens the only linked pull request directly", () => {
+    expect(resolveLinkedPullRequestHeaderAction([link(7)])).toEqual({
+      kind: "open",
+      label: "Open pull request #7",
+      url: "https://github.com/t3tools/t3code/pull/7",
+    });
+  });
+
+  it("lists several linked pull requests", () => {
+    expect(resolveLinkedPullRequestHeaderAction([link(7), link(8)])).toEqual({
+      kind: "list",
+      label: "Linked pull requests (2)",
+    });
+  });
+
+  it("offers nothing without a visible link", () => {
+    expect(resolveLinkedPullRequestHeaderAction(undefined)).toBeNull();
+    expect(resolveLinkedPullRequestHeaderAction([])).toBeNull();
+    expect(
+      resolveLinkedPullRequestHeaderAction([{ ...link(7), source: "stack-dismissed" }]),
+    ).toBeNull();
   });
 });

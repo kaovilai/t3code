@@ -1038,6 +1038,7 @@ function ThreadRouteContent(
         headerColor={headerColor}
         usesNativeHeaderGlass={usesNativeHeaderGlass}
         gitControls={threadGitControlProps}
+        linkedPullRequests={selectedThread.pullRequests}
         hasThreadCwd={selectedThreadCwd !== null}
         hasWorkspaceRoot={Boolean(selectedThreadProject?.workspaceRoot)}
         fileInspectorSupported={fileInspector.supported}
