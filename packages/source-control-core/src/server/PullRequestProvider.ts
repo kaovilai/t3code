@@ -244,7 +244,7 @@ export interface ProviderChangeRequestDetail extends ProviderChangeRequest {
   readonly baseComparison?: PullRequestBaseComparison;
   readonly behindBy?: number;
   /** The host says merging waits for the branch to catch up; absent where it cannot tell. */
-  readonly behindBlocksMerge?: boolean;
+  readonly behindBlocksMerge?: boolean | null;
   /** Absent from a host that does not report whether it is armed to merge this on its own. */
   readonly autoMergeEnabled?: boolean;
   /** The strategy stored with an armed auto-merge, where the host reports it. */

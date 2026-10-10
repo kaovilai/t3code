@@ -1191,6 +1191,8 @@ it.effect("tells the watch the branch must catch up only when GitHub blocks the 
     for (const [blocksMerge, behindBy] of [
       [true, 3],
       [false, 3],
+      // GitHub has not computed the merge state yet: carried through as "cannot tell".
+      [null, 3],
     ] as const) {
       const provider = yield* make.pipe(
         Effect.provide(

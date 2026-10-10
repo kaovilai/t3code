@@ -1609,7 +1609,10 @@ export const make = Effect.gen(function* () {
         { concurrency: 2 },
       ).pipe(
         Effect.map(([rules, protection]): ReadonlyArray<string> | null =>
-          [...new Set([...rules, ...protection])].toSorted(),
+          // Either read tied to a specific app leaves the whole answer unknown.
+          rules === null || protection === null
+            ? null
+            : [...new Set([...rules, ...protection])].toSorted(),
         ),
         // Only a rate limit is the host asking to wait; anything else is "cannot tell", and
         // watching carries on without the missing-check signal.
@@ -1623,6 +1626,9 @@ export const make = Effect.gen(function* () {
     },
     {
       capacity: 128,
+      // The lookup runs with the services of whoever asks, so it reads under their pinned
+      // credential rather than anything captured when the cache was built.
+      requireServicesAt: "lookup",
       // An answer that could not be understood (null) is tried again soon: it may be a host
       // hiccup or a token that could not see the rules, and nothing is waiting on it meanwhile.
       timeToLive: (exit) =>

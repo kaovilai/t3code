@@ -339,30 +339,32 @@ describe("evaluatePullRequestWatch missing required checks", () => {
     assert.deepEqual(done.changes, [{ kind: "checks-passed", count: 2, required: true }]);
   });
 
-  it("clears a missing check once it reports, and reports it again if it vanishes", () => {
+  it("says a missing check once per commit, even if it reports and then vanishes again", () => {
     const now = after(PULL_REQUEST_WATCH_MISSING_GRACE_MS * 2);
     const missing = evaluatePullRequestWatch(watching(), expecting(lintOnly), noRemarks, { now });
     const reported = [required("lint", "success"), required("e2e", "pending")];
     const cleared = evaluatePullRequestWatch(missing.next, expecting(reported), noRemarks, { now });
-    assert.deepEqual(cleared.next.missingChecks, []);
+    assert.deepEqual(cleared.next.missingChecks, ["e2e"]);
     const gone = evaluatePullRequestWatch(cleared.next, expecting(lintOnly), noRemarks, { now });
-    assert.deepEqual(gone.changes, [{ kind: "checks-missing", missing: ["e2e"] }]);
+    assert.deepEqual(gone.changes, []);
+    assert.deepEqual(gone.next.missingChecks, ["e2e"]);
   });
 
-  it("keeps what it reported across a pass that could not tell, so nothing is said twice", () => {
+  it("does not say passed while a check it called missing is still absent and nothing says what is required", () => {
     const now = after(PULL_REQUEST_WATCH_MISSING_GRACE_MS * 2);
     const missing = evaluatePullRequestWatch(watching(), expecting(lintOnly), noRemarks, { now });
-    // A failed check read answers with an empty list; the host not saying has no list at all.
-    for (const unclear of [expecting([]), detail({ checks: lintOnly })]) {
-      const blind = evaluatePullRequestWatch(missing.next, unclear, noRemarks, { now });
-      assert.deepEqual(
-        blind.changes.filter((change) => change.kind === "checks-missing"),
-        [],
-      );
-      assert.deepEqual(blind.next.missingChecks, ["e2e"]);
-      const clear = evaluatePullRequestWatch(blind.next, expecting(lintOnly), noRemarks, { now });
-      assert.deepEqual(clear.changes, []);
-    }
+    // The host cannot say what is required this time: no expectedChecks.
+    const unclear = detail({ checks: lintOnly });
+    const blind = evaluatePullRequestWatch(missing.next, unclear, noRemarks, { now });
+    assert.deepEqual(blind.changes, []);
+    assert.isFalse(blind.next.passed);
+    assert.deepEqual(blind.next.missingChecks, ["e2e"]);
+    // Once it is visibly reported, nothing holds "passed" back.
+    const reported = [required("lint", "success"), required("e2e", "success")];
+    const done = evaluatePullRequestWatch(blind.next, detail({ checks: reported }), noRemarks, {
+      now,
+    });
+    assert.deepEqual(done.changes, [{ kind: "checks-passed", count: 2, required: true }]);
   });
 
   it("counts a check qualified by its workflow as reported", () => {
@@ -517,7 +519,13 @@ describe("evaluatePullRequestWatch behind base", () => {
 
   it("keeps its state when the host could not compare", () => {
     const first = evaluatePullRequestWatch(watch(), behindBlocked(), noRemarks);
-    for (const unclear of [detail({ baseComparison: "unknown" }), detail()]) {
+    for (const unclear of [
+      detail({ baseComparison: "unknown" }),
+      detail(),
+      // GitHub has not computed the merge state: the host cannot tell, whatever the comparison says.
+      detail({ baseComparison: "up-to-date", behindBlocksMerge: null }),
+      detail({ baseComparison: "behind", behindBlocksMerge: null }),
+    ]) {
       const result = evaluatePullRequestWatch(first.next, unclear, noRemarks);
       assert.deepEqual(result.changes, []);
       assert.isTrue(result.next.behind);

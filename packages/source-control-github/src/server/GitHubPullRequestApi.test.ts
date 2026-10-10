@@ -2542,7 +2542,7 @@ layer("GitHubPullRequestApi.layer", (it) => {
             required_status_checks: {
               contexts: ["lint", "build"],
               checks: [
-                { context: "lint", app_id: 1 },
+                { context: "lint", app_id: null },
                 { context: "build", app_id: -1 },
               ],
             },
@@ -3786,7 +3786,9 @@ layer("GitHubPullRequestApi.layer", (it) => {
         ["BEHIND", true],
         ["CLEAN", false],
         ["BLOCKED", false],
-        [undefined, false],
+        // Not computed yet: the host cannot say, which is not the same as "does not block".
+        ["UNKNOWN", null],
+        [undefined, null],
       ] as const;
       for (const [index, [status, blocks]] of cases.entries()) {
         const number = 40 + index;
@@ -3803,6 +3805,81 @@ layer("GitHubPullRequestApi.layer", (it) => {
       }
       const first = mockedExecute.mock.calls[0]?.[0];
       expect(first?.kind === "graphql" ? first.query : "").toContain("mergeStateStatus");
+    }),
+  );
+
+  it.effect("required checks: leaves a requirement tied to a specific app unknown", () =>
+    Effect.gen(function* () {
+      // A name alone cannot tell an app's check from a same-named check from another app.
+      requiredCheckRoutes(
+        [
+          {
+            type: "required_status_checks",
+            parameters: { required_status_checks: [{ context: "lint", integration_id: 15368 }] },
+          },
+        ],
+        { name: "main", protected: false },
+      );
+      assert.isNull(yield* read("acme/ruleset-app"));
+      requiredCheckRoutes([], {
+        name: "main",
+        protected: true,
+        protection: {
+          enabled: true,
+          required_status_checks: { checks: [{ context: "lint", app_id: 15368 }] },
+        },
+      });
+      assert.isNull(yield* read("acme/protection-app"));
+    }),
+  );
+
+  it.effect("required checks: keeps requirements that accept any app", () =>
+    Effect.gen(function* () {
+      requiredCheckRoutes(
+        [
+          {
+            type: "required_status_checks",
+            parameters: { required_status_checks: [{ context: "lint", integration_id: null }] },
+          },
+        ],
+        {
+          name: "main",
+          protected: true,
+          protection: {
+            enabled: true,
+            required_status_checks: {
+              contexts: ["build"],
+              checks: [
+                { context: "build", app_id: -1 },
+                { context: "docs", app_id: null },
+              ],
+            },
+          },
+        },
+      );
+      assert.deepEqual(yield* read("acme/any-app"), ["build", "docs", "lint"]);
+    }),
+  );
+
+  it.effect("required checks: reads under the caller's pinned credential on a cache miss", () =>
+    Effect.gen(function* () {
+      requiredCheckRoutes([], { name: "main", protected: false });
+      // A host no earlier test touched, so the stored credential would be read here if used.
+      const host = "github.pinned.example";
+      mockedCredential.mockClear();
+      const cli = yield* GitHubPullRequestApi.GitHubPullRequestApi;
+      yield* cli
+        .listRequiredCheckNames({ cwd: "/w", repository: "acme/pinned", host, baseBranch: "main" })
+        .pipe(
+          Effect.provideService(GitHubApi.PinnedGitHubCredential, {
+            host,
+            token: Redacted.make("pinned-token"),
+            credentialFingerprint: "pinned",
+          }),
+        );
+      // The pinned account made the reads; the stored default credential was never consulted.
+      expect(mockedCredential).not.toHaveBeenCalled();
+      expect(restCallsTo("acme/pinned/").length).toBe(2);
     }),
   );
 
@@ -3864,7 +3941,7 @@ layer("GitHubPullRequestApi.layer", (it) => {
       expect(detail.comparison).toEqual({
         behindBy: 2,
         viewerCanUpdate: true,
-        blocksMerge: false,
+        blocksMerge: null, // the fixture names no merge status: "cannot tell", not "does not block"
       });
       // Conversation activity is its own read, and asks for the head of the conversation once.
       expect(queryAt(1)).toContain("reviews(");

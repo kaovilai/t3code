@@ -542,6 +542,14 @@ export const make = Effect.gen(function* () {
     const remarks = Option.isSome(activity)
       ? yield* readRemarks(group.key, reference, activity.value)
       : null;
+    // Each watch is evaluated once, before the read is recorded: whether a required check is
+    // still awaited depends on what this pass tells the agent, not on what it was told before.
+    const reports = new Map(
+      group.targets.map(
+        (target) =>
+          [target, evaluatePullRequestWatch(target.watch, detail, remarks, { now })] as const,
+      ),
+    );
     lastReads.set(group.key, {
       at: plan.activity || last === undefined ? now : last.at,
       fingerprint: group.fingerprint,
@@ -550,7 +558,7 @@ export const make = Effect.gen(function* () {
       inFlight:
         detail.mergeability === "unknown" ||
         detail.checks.some((check) => check.status === "pending") ||
-        group.targets.some((target) => awaitsRequiredChecks(target.watch, detail)),
+        group.targets.some((target) => awaitsRequiredChecks(reports.get(target)!.next, detail)),
       // Comments a partial read could not see are read again next pass.
       remarksComplete: plan.activity ? remarks !== null : (last?.remarksComplete ?? false),
       watches: new Set(group.targets.map(watchKey)),
@@ -558,7 +566,7 @@ export const make = Effect.gen(function* () {
       remarks: fingerprint?.remarks ?? null,
     });
     yield* eachTarget(group, (target) => {
-      const report = evaluatePullRequestWatch(target.watch, detail, remarks, { now });
+      const report = reports.get(target)!;
       if (report.changes.length > 0) {
         return record(
           target,

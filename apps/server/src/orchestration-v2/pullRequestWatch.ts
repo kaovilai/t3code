@@ -120,7 +120,12 @@ export function evaluatePullRequestWatch(
   // Absent from the list, not failing in it, so only the names the host says are required can
   // tell. The wait lets the host create the check, and holds back "passed" in the meantime.
   const absentNow = absentRequiredChecks(detail);
-  const absent = absentNow ?? [];
+  // A pass that cannot tell still holds "passed" back for a check it called missing and has not
+  // seen report since, so it cannot announce success the last pass said was not there yet.
+  const stillMissing = missingChecks.filter(
+    (name) => !detail.checks.some((check) => reportsAs(check, name)),
+  );
+  const absent = absentNow ?? stillMissing;
   const graceOver =
     clock.now !== undefined &&
     headSeenAt !== null &&
@@ -129,8 +134,8 @@ export function evaluatePullRequestWatch(
   if (graceOver && absentNow !== null) {
     const newlyMissing = absent.filter((name) => !missingChecks.includes(name));
     if (newlyMissing.length > 0) changes.push({ kind: "checks-missing", missing: newlyMissing });
-    // A check that reports leaves the list, so one that vanishes again is reported again.
-    missingChecks = absent;
+    // Kept until the head moves, so a check that reports and vanishes again is not said twice.
+    missingChecks = [...missingChecks, ...newlyMissing];
   }
 
   if (detail.checks.length > 0) {
@@ -189,11 +194,15 @@ export function evaluatePullRequestWatch(
   // Where the host tells apart a branch that must catch up from one that merely trails, only the
   // first is news; elsewhere the comparison stands in. A pass that cannot tell keeps the last
   // state, and a push starts over so a branch still behind is reported on its new commit.
+  // `null` from the host is "distinguishes, but could not tell this time"; absent is "does not
+  // distinguish", where the comparison stands in.
   const behindNow =
-    detail.behindBlocksMerge ??
-    (detail.baseComparison === undefined || detail.baseComparison === "unknown"
+    detail.behindBlocksMerge === null
       ? null
-      : detail.baseComparison === "behind");
+      : (detail.behindBlocksMerge ??
+        (detail.baseComparison === undefined || detail.baseComparison === "unknown"
+          ? null
+          : detail.baseComparison === "behind"));
   const wasBehind = headMoved ? false : watch.behind;
   if (behindNow === true && !wasBehind) changes.push({ kind: "behind" });
   const behind = behindNow ?? wasBehind;

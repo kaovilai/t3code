@@ -918,9 +918,10 @@ export const PullRequestDetail = Schema.Struct({
   /**
    * The host says merging waits until the branch catches up with its base, which is narrower than
    * `baseComparison`: a branch can be behind with nothing requiring it to be current. Absent where
-   * the host does not tell the two apart.
+   * the host does not tell the two apart. Null where it does, but could not say this time (GitHub
+   * still computing the merge state), which is not the same as "does not block".
    */
-  behindBlocksMerge: Schema.optional(Schema.Boolean),
+  behindBlocksMerge: Schema.optional(Schema.NullOr(Schema.Boolean)),
   /**
    * Whether the host is already armed to merge this on its own. Absent where the host does not
    * report it, which is not the same as off: a page that reads silence as "not armed" offers to
