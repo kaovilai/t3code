@@ -1,9 +1,14 @@
 package expo.modules.t3composereditor
 
 import android.content.ClipData
+import android.content.ClipDescription
 import android.content.ClipboardManager
 import android.content.Context
+import android.net.Uri
 import android.view.KeyEvent
+import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputContentInfo
+import androidx.core.view.inputmethod.EditorInfoCompat
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -119,5 +124,43 @@ class ComposerPasteTest {
     assertFalse(pasteAsText())
     assertEquals("unchanged", editor.text.toString())
     assertNull(intercepted)
+  }
+
+  private fun commitContent(mimeType: String): Pair<Boolean, List<String>> {
+    val info = EditorInfo()
+    val connection = editor.onCreateInputConnection(info)!!
+    assertTrue(EditorInfoCompat.getContentMimeTypes(info).contains("image/*"))
+    val pasted = mutableListOf<String>()
+    editor.pasteImagesListener = { pasted += it }
+    val content = InputContentInfo(
+      Uri.parse("content://com.example/sticker"),
+      ClipDescription("sticker", arrayOf(mimeType))
+    )
+    return connection.commitContent(content, 0, null) to pasted
+  }
+
+  @Test
+  fun keyboardCommittedImagesArePasted() {
+    val (handled, pasted) = commitContent("image/png")
+
+    assertTrue(handled)
+    assertEquals(listOf("content://com.example/sticker"), pasted)
+  }
+
+  @Test
+  fun keyboardCommittedNonImagesAreRejected() {
+    val (handled, pasted) = commitContent("application/pdf")
+
+    assertFalse(handled)
+    assertTrue(pasted.isEmpty())
+  }
+
+  @Test
+  fun readOnlyEditorRejectsKeyboardCommittedImages() {
+    editor.readOnly = true
+    val (handled, pasted) = commitContent("image/png")
+
+    assertFalse(handled)
+    assertTrue(pasted.isEmpty())
   }
 }

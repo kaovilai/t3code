@@ -26,6 +26,9 @@ import android.view.inputmethod.InputConnection
 import android.view.inputmethod.InputConnectionWrapper
 import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
+import androidx.core.view.inputmethod.EditorInfoCompat
+import androidx.core.view.inputmethod.InputConnectionCompat
+import androidx.core.view.inputmethod.InputContentInfoCompat
 import expo.modules.kotlin.AppContext
 import expo.modules.kotlin.viewevent.EventDispatcher
 import expo.modules.kotlin.views.ExpoView
@@ -662,7 +665,14 @@ internal class SelectionAwareEditText(context: Context) : EditText(context) {
 
   override fun onCreateInputConnection(outAttrs: EditorInfo): InputConnection? {
     val connection = super.onCreateInputConnection(outAttrs) ?: return null
-    return object : InputConnectionWrapper(connection, false) {
+    // Keyboards such as Gboard paste clipboard images and stickers through
+    // InputConnection.commitContent rather than the paste menu, and only
+    // offer them when the field advertises the MIME types it accepts.
+    EditorInfoCompat.setContentMimeTypes(outAttrs, arrayOf("image/*"))
+    val contentConnection = InputConnectionCompat.createWrapper(this, connection, outAttrs) { contentInfo, flags, _ ->
+      commitImageContent(contentInfo, flags)
+    }
+    return object : InputConnectionWrapper(contentConnection, false) {
       override fun deleteSurroundingText(
         beforeLength: Int,
         afterLength: Int
@@ -675,6 +685,28 @@ internal class SelectionAwareEditText(context: Context) : EditText(context) {
         super.deleteSurroundingTextInCodePoints(beforeLength, afterLength)
     }
   }
+
+  private fun commitImageContent(
+    contentInfo: InputContentInfoCompat,
+    flags: Int
+  ): Boolean {
+    val listener = pasteImagesListener
+    if (readOnly || listener == null) return false
+    val hasImage = (0 until contentInfo.description.mimeTypeCount).any {
+      contentInfo.description.getMimeType(it).startsWith("image/")
+    }
+    if (!hasImage) return false
+    if (flags and InputConnectionCompat.INPUT_CONTENT_GRANT_READ_URI_PERMISSION != 0) {
+      try {
+        contentInfo.requestPermission()
+      } catch (_: Exception) {
+        return false
+      }
+    }
+    listener(listOf(contentInfo.contentUri.toString()))
+    return true
+  }
+
   override fun onSelectionChanged(selStart: Int, selEnd: Int) {
     super.onSelectionChanged(selStart, selEnd)
     selectionListener?.invoke(selStart, selEnd)
