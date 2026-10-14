@@ -4,7 +4,7 @@ import { Alert } from "react-native";
 import { ScreenHeader } from "../../components/ScreenHeader";
 import { ScreenHeaderButton } from "../../components/ScreenHeaderButton";
 import type { ScreenHeaderAction } from "../../components/ScreenHeader.types";
-import { tryOpenExternalUrl } from "../../lib/openExternalUrl";
+import { useOpenPullRequest } from "../../native/useOpenPullRequest";
 import { useAdaptiveWorkspaceLayout } from "../layout/AdaptiveWorkspaceLayout";
 import { resolveLinkedPullRequestHeaderAction } from "./git/linkedPullRequestStatus";
 import type { ThreadInspectorMode } from "./thread-inspector-content-stack";
@@ -27,6 +27,7 @@ export function ThreadHeader(
   const { layout, panes, toggleAuxiliaryPane } = useAdaptiveWorkspaceLayout();
   const { onOpenTerminal, onMergeBack } = props.gitControls;
   const native = useThreadHeaderOptions(props);
+  const openPullRequest = useOpenPullRequest();
   const linkedPullRequestAction = useMemo(
     () => resolveLinkedPullRequestHeaderAction(props.linkedPullRequests),
     [props.linkedPullRequests],
@@ -68,13 +69,11 @@ export function ThreadHeader(
         onPress:
           linkedPullRequestAction.kind === "open"
             ? () => {
-                void tryOpenExternalUrl(linkedPullRequestAction.url, "pull-request").then(
-                  (opened) => {
-                    if (!opened) {
-                      Alert.alert("Unable to open PR", "The pull request could not be opened.");
-                    }
-                  },
-                );
+                void openPullRequest(linkedPullRequestAction.url).then((opened) => {
+                  if (!opened) {
+                    Alert.alert("Unable to open PR", "The pull request could not be opened.");
+                  }
+                });
               }
             : props.onOpenGitInspector,
       });
@@ -89,6 +88,7 @@ export function ThreadHeader(
     return actions;
   }, [
     linkedPullRequestAction,
+    openPullRequest,
     props.inspectorMode,
     panes.auxiliaryPaneVisible,
     props.onOpenFilesInspector,
