@@ -1,15 +1,16 @@
 import type { ThreadPullRequestLink } from "@t3tools/contracts";
 import { useMemo } from "react";
-import { Alert } from "react-native";
-import { ScreenHeader } from "../../components/ScreenHeader";
-import { ScreenHeaderButton } from "../../components/ScreenHeaderButton";
-import type { ScreenHeaderAction } from "../../components/ScreenHeader.types";
+import { AppBar } from "../../components/ui/AppBar";
+import { ScreenHeaderButton } from "../../components/ui/ScreenHeaderButton";
+import type { AppBarAction } from "../../components/ui/AppBar.types";
+import * as Dialog from "../../components/ui/Dialog";
 import { useOpenPullRequest } from "../../native/useOpenPullRequest";
 import { useAdaptiveWorkspaceLayout } from "../layout/AdaptiveWorkspaceLayout";
 import { resolveLinkedPullRequestHeaderAction } from "./git/linkedPullRequestStatus";
 import type { ThreadInspectorMode } from "./thread-inspector-content-stack";
 import { useThreadHeaderOptions } from "./useThreadHeaderOptions";
 import { useWorkspaceListNavigation } from "../workspace/useAndroidWorkspaceNavigation";
+import { PullRequestGlyph } from "../pull-requests/pullRequestGlyphs";
 
 export function ThreadHeader(
   props: Parameters<typeof useThreadHeaderOptions>[0] & {
@@ -32,8 +33,8 @@ export function ThreadHeader(
     () => resolveLinkedPullRequestHeaderAction(props.linkedPullRequests),
     [props.linkedPullRequests],
   );
-  const androidHeaderActions = useMemo<ReadonlyArray<ScreenHeaderAction>>(() => {
-    const actions: ScreenHeaderAction[] = [];
+  const androidHeaderActions = useMemo<ReadonlyArray<AppBarAction>>(() => {
+    const actions: AppBarAction[] = [];
     if (props.onReturnToThread) {
       actions.push({
         accessibilityLabel: "Return to chat",
@@ -65,13 +66,13 @@ export function ThreadHeader(
     if (linkedPullRequestAction !== null) {
       actions.push({
         accessibilityLabel: linkedPullRequestAction.label,
-        icon: "arrow.triangle.pull",
+        icon: PullRequestGlyph.pullRequest,
         onPress:
           linkedPullRequestAction.kind === "open"
             ? () => {
                 void openPullRequest(linkedPullRequestAction.url).then((opened) => {
                   if (!opened) {
-                    Alert.alert("Unable to open PR", "The pull request could not be opened.");
+                    Dialog.alert("Unable to open PR", "The pull request could not be opened.");
                   }
                 });
               }
@@ -81,7 +82,7 @@ export function ThreadHeader(
     if (onMergeBack) {
       actions.push({
         accessibilityLabel: "Merge back to source",
-        icon: "arrow.triangle.merge",
+        icon: PullRequestGlyph.merged,
         onPress: onMergeBack,
       });
     }
@@ -104,7 +105,7 @@ export function ThreadHeader(
 
   return (
     <>
-      <ScreenHeader
+      <AppBar
         title={props.title}
         subtitle={props.subtitle}
         sidebar={native.sidebar}
